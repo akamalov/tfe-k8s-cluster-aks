@@ -2,4 +2,4 @@
 *.tfstate.backup
 *.tfvars
 translations/
-*/.terraform/
+.terraform/
