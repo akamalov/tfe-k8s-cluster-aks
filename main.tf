@@ -86,6 +86,9 @@ resource "null_resource" "install_az" {
     command = "export AZ_REPO=$(lsb_release -cs)"
   }
   provisioner "local-exec" {
+    command = "echo $AZ_REPO"
+  }
+  provisioner "local-exec" {
     command = "echo \"deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main\" | sudo tee /etc/apt/sources.list.d/azure-cli.list"
   }
   provisioner "local-exec" {
