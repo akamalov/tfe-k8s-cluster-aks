@@ -33,6 +33,20 @@ resource "azurerm_resource_group" "k8sexample" {
   location = "${var.azure_location}"
 }
 
+resource "azurerm_virtual_network" "k8s_vnet" {
+  name                = "rogerk8svnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = "${azurerm_resource_group.k8sexample.location}"
+  resource_group_name = "${azurerm_resource_group.k8sexample.name}"
+}
+
+resource "azurerm_subnet" "k8s_subnet" {
+  name                 = "rogerk8ssubnet"
+  resource_group_name  = "${azurerm_resource_group.k8sexample.name}"
+  virtual_network_name = "${azurerm_virtual_network.k8s_vnet.name}"
+  address_prefix       = "10.0.1.0/24"
+}
+
 # Azure Container Service (AKS) Cluster
 resource "azurerm_kubernetes_cluster" "k8sexample" {
   name = "${var.cluster_name}"
@@ -54,6 +68,7 @@ resource "azurerm_kubernetes_cluster" "k8sexample" {
     os_type    = "${var.os_type}"
     os_disk_size_gb = "${var.os_disk_size}"
     vm_size    = "${var.vm_size}"
+    vnet_subnet_id = "${azurerm_subnet.k8s_subnet.id}"
   }
 
   service_principal {
@@ -66,28 +81,50 @@ resource "azurerm_kubernetes_cluster" "k8sexample" {
   }
 }
 
-/*resource "null_resource" "get_config" {
+resource "null_resource" "install_az" {
   provisioner "local-exec" {
-    command = "echo '${chomp(tls_private_key.ssh_key.private_key_pem)}' > private_key.pem"
+    command = "AZ_REPO=$(lsb_release -cs)"
   }
   provisioner "local-exec" {
-    command = "chmod 600 private_key.pem"
+    command = "echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+     sudo tee /etc/apt/sources.list.d/azure-cli.list"
   }
   provisioner "local-exec" {
-    command = "sleep 120"
+    command = "sudo apt-key adv --keyserver packages.microsoft.com --recv-keys 52E16F86FEE04B979B07E28DB02C46DF417A0893"
   }
   provisioner "local-exec" {
-    command = "scp -o StrictHostKeyChecking=no -i private_key.pem azureuser@${azurerm_kubernetes_cluster.k8sexample.fqdn}:~/.kube/config config"
+    command = "curl -L https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -"
   }
   provisioner "local-exec" {
-    command = "sed -n 6,6p config | cut -d '\"' -f 2 > ca_certificate"
+    command = "sudo apt-get -y install apt-transport-https"
   }
   provisioner "local-exec" {
-    command = "sed -n 19,19p config | cut -d '\"' -f 2 > client_certificate"
+    command = "sudo apt-get update && sudo apt-get -y install azure-cli"
+  }
+  depends_on = ["azurerm_kubernetes_cluster.k8sexample"]
+}
+
+resource "null_resource" "az_login" {
+  provisioner "local-exec" {
+    command = "az login --service-principal --username ${data.vault_generic_secret.azure_credentials.data["client_id"]} --password ${data.vault_generic_secret.azure_credentials.data["client_secret"]} --tenant ${data.vault_generic_secret.azure_credentials.data["tenant_id"]}"
+  }
+  depends_on = ["null_resource.install_az"]
+}
+
+resource "null_resource" "get_config" {
+  provisioner "local-exec" {
+    command = "az aks get-credentials --resource-group=${var.resource_group_name} --name=${var.cluster_name} --file config"
   }
   provisioner "local-exec" {
-    command = "sed -n 20,20p config | cut -d '\"' -f 2 > client_key"
+    command = "sed -n 4,4p config | cut -d ':' -f 2 | sed 's/ //' > ca_certificate"
   }
+  provisioner "local-exec" {
+    command = "sed -n 18,18p config | cut -d ':' -f 2 | sed 's/ //'  > client_certificate"
+  }
+  provisioner "local-exec" {
+    command = "sed -n 19,19p config | cut -d ':' -f 2 | sed 's/ //' > client_key"
+  }
+  depends_on = ["null_resource.az_login"]
 }
 
 data "null_data_source" "get_certs" {
@@ -115,4 +152,4 @@ resource "vault_generic_secret" "role" {
     "ttl": "24h"
   }
   EOT
-} */
+}
