@@ -134,7 +134,7 @@ data "null_data_source" "get_certs" {
 
 resource "null_resource" "auth_config" {
   provisioner "local-exec" {
-    command = "curl --header \"X-Vault-Token: $VAULT_TOKEN\" --header \"Content-Type: application/json\" --request POST --data '{ \"kubernetes_host\": \"https://${azurerm_kubernetes_cluster.k8sexample.fqdn}:443\", \"kubernetes_ca_cert\": \"${chomp(replace(base64decode(data.null_data_source.get_certs.outputs["ca_certificate"]), "/\\r\n/", "\\n"))}\" }' ${var.vault_addr}/v1/auth/${vault_auth_backend.k8s.path}config"
+    command = "curl --header \"X-Vault-Token: $VAULT_TOKEN\" --header \"Content-Type: application/json\" --request POST --data '{ \"kubernetes_host\": \"https://${azurerm_kubernetes_cluster.k8sexample.fqdn}\", \"kubernetes_ca_cert\": \"${chomp(replace(base64decode(data.null_data_source.get_certs.outputs["ca_certificate"]), "\n", "\\n"))}\" }' ${var.vault_addr}/v1/auth/${vault_auth_backend.k8s.path}config"
   }
 }
 
