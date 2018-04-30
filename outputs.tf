@@ -26,6 +26,9 @@ output "k8s_master_auth_cluster_ca_certificate" {
 output "master_public_dns" {
   value = ""
 }
+output "master_public_ip" {
+  value = ""
+}
 output "bastion_public_dns" {
   value = ""
 }
