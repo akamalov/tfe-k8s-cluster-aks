@@ -22,6 +22,14 @@ output "k8s_master_auth_cluster_ca_certificate" {
   value = "${data.null_data_source.get_certs.outputs["ca_certificate"]}"
 }
 
+# These support deploying cats-and-dogs apps against all 3 clouds from single workspace
+output "master_public_dns" {
+  value = ""
+}
+output "bastion_public_dns" {
+  value = ""
+}
+
 output "vault_k8s_auth_backend" {
   value = "${vault_auth_backend.k8s.path}"
 }
